@@ -1,0 +1,31 @@
+{
+  "name": "yingshi-backend",
+  "version": "1.0.0",
+  "description": "萤石视频监控后端服务 - 动态资产管理 + Token缓存中转",
+  "main": "src/app.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "init-db": "node scripts/init-db.js"
+  },
+  "keywords": [
+    "ezviz",
+    "monitor",
+    "video",
+    "surveillance"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "ioredis": "^5.3.2",
+    "mysql2": "^3.6.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
