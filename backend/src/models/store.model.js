@@ -2,16 +2,17 @@ import { memoryDB } from '../config/memory-db.js';
 import pool from '../config/database.js';
 
 // 判断是否使用内存模式（数据库连接失败时自动降级）
-let useMemory = false;
+// 默认使用内存模式（安全），仅当 MySQL 连接成功时才切换到数据库
+let useMemory = true;
 
 // 测试数据库连接
 pool.getConnection()
   .then(conn => {
+    useMemory = false;
     conn.release();
     console.log('✅ 使用 MySQL 数据库');
   })
   .catch(() => {
-    useMemory = true;
     console.log('⚠️  MySQL 连接失败，使用内存数据库模式');
   });
 

@@ -21,110 +21,146 @@
       />
     </div>
 
-    <!-- 右侧：主内容 -->
-    <div class="main-content">
-      <div class="top-toolbar">
-        <div class="toolbar-left">
-          <span class="store-name">
-            {{ currentStoreName || '未选择门店' }}
-          </span>
-          <span v-if="currentCameras.length" class="camera-count">
-            {{ currentCameras.length }}路摄像头
-          </span>
-          <span v-if="apiLoading" class="loading-tag">加载中...</span>
-        </div>
-        <div class="toolbar-right">
-          <div v-if="isPlayback && currentCameras.length" class="playback-time">
+    <!-- 右侧：主区域（视频 + 配送面板） -->
+    <div class="main-area">
+      <!-- 视频主内容 -->
+      <div class="main-content">
+        <div class="top-toolbar">
+          <div class="toolbar-left">
+            <span class="store-name">
+              {{ currentStoreName || '未选择门店' }}
+            </span>
+            <span v-if="currentCameras.length" class="camera-count">
+              {{ currentCameras.length }}路摄像头
+            </span>
+            <span v-if="apiLoading" class="loading-tag">加载中...</span>
+          </div>
+          <div class="toolbar-right">
+            <div v-if="isPlayback && currentCameras.length" class="playback-time">
+              <input
+                type="date"
+                :value="playbackDate"
+                @change="setPlaybackDate($event.target.value)"
+                class="date-input"
+                title="选择回放日期"
+              />
+              <select
+                v-model="playbackHour"
+                class="hour-select"
+                title="选择回放开始小时"
+              >
+                <option v-for="h in 24" :key="h-1" :value="h-1">
+                  {{ String(h-1).padStart(2,'0') }}:00
+                </option>
+              </select>
+              <button
+                v-if="hasCloudStorageCamera"
+                class="storage-toggle"
+                :class="{ cloud: useCloudStorage }"
+                @click="useCloudStorage = !useCloudStorage"
+                :title="useCloudStorage ? '当前: 云存储' : '当前: 本地存储'"
+              >
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="margin-right:2px;vertical-align:-2px">
+                  <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/>
+                </svg>
+                {{ useCloudStorage ? '云存储' : '本地' }}
+              </button>
+            </div>
             <input
+              v-if="currentCameras.length"
               type="date"
-              :value="playbackDate"
-              @change="setPlaybackDate($event.target.value)"
+              :value="deliveryDate"
+              @change="deliveryDate = $event.target.value; loadDeliveryEvents(currentStoreId)"
               class="date-input"
-              title="选择回放日期"
+              title="选择配送查询日期"
+              style="width:130px"
             />
-            <select
-              v-model="playbackHour"
-              class="hour-select"
-              title="选择回放开始小时"
-            >
-              <option v-for="h in 24" :key="h-1" :value="h-1">
-                {{ String(h-1).padStart(2,'0') }}:00
-              </option>
-            </select>
             <button
-              v-if="hasCloudStorageCamera"
-              class="storage-toggle"
-              :class="{ cloud: useCloudStorage }"
-              @click="useCloudStorage = !useCloudStorage"
-              :title="useCloudStorage ? '当前: 云存储' : '当前: 本地存储'"
+              v-if="currentCameras.length"
+              class="delivery-toggle"
+              :class="{ active: showDeliveryPanel }"
+              @click="showDeliveryPanel = !showDeliveryPanel"
+              title="配送事件"
             >
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="margin-right:2px;vertical-align:-2px">
-                <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="margin-right:3px;vertical-align:-2px">
+                <path d="M19 7h-3V6c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v1H5c-1.1 0-2 .9-2 2v1h18V9c0-1.1-.9-2-2-2zm-5 0h-4V6h4v1zM5 19c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-7H5v7z"/>
               </svg>
-              {{ useCloudStorage ? '云存储' : '本地' }}
+              配送
+            </button>
+            <div class="screen-toggle">
+              <button
+                :class="{ active: isSingleScreen }"
+                @click="toggleScreen(true)"
+              >
+                <el-icon><FullScreen /></el-icon>
+                单屏
+              </button>
+              <button
+                :class="{ active: !isSingleScreen }"
+                @click="toggleScreen(false)"
+              >
+                <el-icon><Grid /></el-icon>
+                4分屏
+              </button>
+            </div>
+            <button
+              class="playback-btn"
+              :class="{ active: isPlayback }"
+              @click="togglePlayback"
+              :disabled="!currentCameras.length"
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="margin-right:3px;vertical-align:-2px">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 13.5v-7l6 3.5-6 3.5z"/>
+              </svg>
+              回放
             </button>
           </div>
-          <div class="screen-toggle">
-            <button
-              :class="{ active: isSingleScreen }"
-              @click="toggleScreen(true)"
-            >
-              <el-icon><FullScreen /></el-icon>
-              单屏
-            </button>
-            <button
-              :class="{ active: !isSingleScreen }"
-              @click="toggleScreen(false)"
-            >
-              <el-icon><Grid /></el-icon>
-              4分屏
-            </button>
-          </div>
-          <button
-            class="playback-btn"
-            :class="{ active: isPlayback }"
-            @click="togglePlayback"
-            :disabled="!currentCameras.length"
+        </div>
+
+        <div ref="gridRef" class="video-grid" :class="isSingleScreen ? 'layout-1' : 'layout-4'">
+          <div
+            v-for="(slot, index) in visibleSlots"
+            :key="slot.key"
+            class="video-slot"
+            :class="{ 'dblclick-fullscreen': !isSingleScreen }"
+            @dblclick="!isSingleScreen && zoomToSingle(index)"
           >
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="margin-right:3px;vertical-align:-2px">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 13.5v-7l6 3.5-6 3.5z"/>
-            </svg>
-            回放
-          </button>
+            <div class="slot-header">
+              <span class="slot-label">{{ slot.label }}</span>
+              <span class="slot-status" :class="slot.connected ? 'online' : ''">
+                {{ slot.connected ? (isPlayback ? '● 回放中' : '● 直播中') : '○ 未连接' }}
+              </span>
+            </div>
+            <EzPlayer
+              v-if="slot.camera"
+              :key="playerKey(slot.camera, index)"
+              :url="playerUrl(slot.camera)"
+              :access-token="currentToken"
+              :validate-code="slot.camera.validateCode"
+              :enable-zoom="true"
+              :is-playback-mode="isPlayback"
+              :template="isPlayback ? 'pcRec' : 'pcLive'"
+              @ready="onPlayerReady(index)"
+              @error="onPlayerError(index, $event)"
+            />
+            <div v-else class="placeholder">
+              <el-icon :size="48" color="#555"><VideoCameraFilled /></el-icon>
+              <span>无信号</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div ref="gridRef" class="video-grid" :class="isSingleScreen ? 'layout-1' : 'layout-4'">
-        <div
-          v-for="(slot, index) in visibleSlots"
-          :key="slot.key"
-          class="video-slot"
-          :class="{ 'dblclick-fullscreen': !isSingleScreen }"
-          @dblclick="!isSingleScreen && zoomToSingle(index)"
-        >
-          <div class="slot-header">
-            <span class="slot-label">{{ slot.label }}</span>
-            <span class="slot-status" :class="slot.connected ? 'online' : ''">
-              {{ slot.connected ? '● 直播中' : '○ 未连接' }}
-            </span>
-          </div>
-          <EzPlayer
-            v-if="slot.camera"
-            :key="playerKey(slot.camera, index)"
-            :url="playerUrl(slot.camera)"
-            :access-token="currentToken"
-            :validate-code="slot.camera.validateCode"
-            :enable-zoom="true"
-            :is-playback-mode="isPlayback"
-            @ready="onPlayerReady(index)"
-            @error="onPlayerError(index, $event)"
-          />
-          <div v-else class="placeholder">
-            <el-icon :size="48" color="#555"><VideoCameraFilled /></el-icon>
-            <span>无信号</span>
-          </div>
-        </div>
-      </div>
+      <!-- 右侧配送事件面板 -->
+      <DeliveryPanel
+        v-if="showDeliveryPanel && currentCameras.length"
+        :orders="deliveryOrders"
+        :loading="deliveryLoading"
+        :active-key="activeDeliveryKey"
+        @close="showDeliveryPanel = false"
+        @jump-to-time="handleDeliveryJump"
+        @play-segment="handleDeliveryPlaySegment"
+      />
     </div>
   </div>
 </template>
@@ -132,8 +168,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { FullScreen, Grid, VideoCameraFilled } from '@element-plus/icons-vue'
-import { fetchStoreTree, fetchStoreCameras } from './api/index.js'
+import { fetchStoreTree, fetchStoreCameras, fetchDeliveryEvents } from './api/index.js'
 import EzPlayer from './components/EzPlayer.vue'
+import DeliveryPanel from './components/DeliveryPanel.vue'
 
 // ── 数据 ──
 const storeTreeData = ref([])
@@ -144,17 +181,30 @@ const apiLoading = ref(false)
 
 // 当前播放状态
 const currentStoreName = ref('')
-const currentStoreId = ref(null)       // 记住当前门店ID，切分屏时重新拉取
+const currentStoreId = ref(null)
 const currentToken = ref('')
 const currentCameras = ref([])
 const isSingleScreen = ref(false)
 const gridRef = ref(null)
+
+// 4分屏流缓存：从单屏切回4分屏时复用已加载的数据，避免重复 API 调用
+const cachedStoreData = ref(null)  // { storeId, cameras, token }
 
 // 回放模式
 const isPlayback = ref(false)
 const playbackDate = ref('')
 const playbackHour = ref(0)
 const useCloudStorage = ref(false)  // true=云存储回放, false=本地存储回放
+
+// 配送事件（精确时间跳转）
+const playbackExactParams = ref(null)  // { begin: 'yyyyMMddHHmmss', end: 'yyyyMMddHHmmss' } | null
+
+// 配送面板
+const showDeliveryPanel = ref(false)
+const deliveryOrders = ref([])
+const deliveryLoading = ref(false)
+const activeDeliveryKey = ref('')
+const deliveryDate = ref(todayStr())
 
 // 门店总数（从树数据中计算）
 const storeCount = computed(() => {
@@ -226,7 +276,17 @@ function formatTimeParam(dateStr, hour) {
 function playerUrl(camera) {
   if (!camera) return ''
   if (isPlayback.value) {
-    const { begin, end } = formatTimeParam(playbackDate.value, playbackHour.value)
+    let begin, end
+    if (playbackExactParams.value) {
+      // 配送事件精确跳转时间
+      begin = playbackExactParams.value.begin
+      end = playbackExactParams.value.end
+    } else {
+      // 普通小时级回放
+      const params = formatTimeParam(playbackDate.value, playbackHour.value)
+      begin = params.begin
+      end = params.end
+    }
     // 云存储优先（当用户选择云存储且摄像头支持时）
     const base = (useCloudStorage.value && camera.cloudRecUrl) ? camera.cloudRecUrl : camera.recUrl
     if (!base) return ''
@@ -240,7 +300,12 @@ function playerKey(camera, index) {
   if (!camera) return `empty-${index}`
   const qual = isSingleScreen.value ? 'hd' : 'sd'
   const recType = isPlayback.value ? (useCloudStorage.value ? 'cloud' : 'rec') : qual
-  const timeTag = isPlayback.value ? `${playbackDate.value || 'today'}-h${playbackHour.value}` : ''
+  const exactTag = playbackExactParams.value
+    ? `-exact-${playbackExactParams.value.begin}`
+    : ''
+  const timeTag = isPlayback.value
+    ? `${playbackDate.value || 'today'}-h${playbackHour.value}${exactTag}`
+    : ''
   return `p-${camera.id}-${recType}-${timeTag}-${index}`
 }
 
@@ -255,11 +320,93 @@ const togglePlayback = () => {
   if (!currentCameras.value.length) return
   isPlayback.value = !isPlayback.value
   connectedFlags.value = {}
+  resetExactPlayback()
   if (isPlayback.value && !playbackDate.value) {
     const today = new Date()
     playbackDate.value = today.toISOString().slice(0, 10)
     playbackHour.value = 0
   }
+}
+
+// ── 日期工具 ──
+function todayStr() {
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+// ── 配送事件处理 ──
+
+// 加载配送事件
+async function loadDeliveryEvents(storeId) {
+  if (!storeId) {
+    deliveryOrders.value = []
+    return
+  }
+  deliveryLoading.value = true
+  try {
+    const data = await fetchDeliveryEvents(storeId, deliveryDate.value)
+    deliveryOrders.value = data.orders || []
+  } catch (e) {
+    console.error('加载配送事件失败:', e)
+    deliveryOrders.value = []
+  } finally {
+    deliveryLoading.value = false
+  }
+}
+
+/**
+ * 点击时间线事件 → 跳转到精确时间
+ * 所有摄像头切到回放模式，定位到该事件发生的秒级时间点
+ */
+function handleDeliveryJump({ time }) {
+  const d = new Date(time)
+  if (isNaN(d.getTime())) return
+  const pad = (n) => String(n).padStart(2, '0')
+  const begin = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
+  // End: 当前时间 + 5 分钟（给 SDK 充裕的定位范围）
+  const endD = new Date(d.getTime() + 5 * 60000)
+  const end = `${endD.getFullYear()}${pad(endD.getMonth()+1)}${pad(endD.getDate())}${pad(endD.getHours())}${pad(endD.getMinutes())}${pad(endD.getSeconds())}`
+
+  playbackExactParams.value = { begin, end }
+  // 同步日期/小时到事件时间
+  playbackDate.value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+  playbackHour.value = d.getHours()
+
+  if (!isPlayback.value) {
+    isPlayback.value = true
+  }
+  connectedFlags.value = {}
+}
+
+/**
+ * 点击"回放配送过程" → 从骑手到店到配送中
+ */
+function handleDeliveryPlaySegment({ begin: beginTime, end: endTime }) {
+  const fmt = (iso) => {
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return ''
+    const pad = (n) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
+  }
+  const begin = fmt(beginTime)
+  const end = fmt(endTime)
+  if (!begin || !end) return
+
+  playbackExactParams.value = { begin, end }
+  const d = new Date(beginTime)
+  playbackDate.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  playbackHour.value = d.getHours()
+
+  if (!isPlayback.value) {
+    isPlayback.value = true
+  }
+  connectedFlags.value = {}
+}
+
+// 重置精确回放参数
+function resetExactPlayback() {
+  playbackExactParams.value = null
 }
 
 // ── 点击树节点 ──
@@ -274,6 +421,7 @@ const handleNodeClick = async (data) => {
 
   connectedFlags.value = {}
   isPlayback.value = false
+  resetExactPlayback()
 
   // 从 API 拉取该门店的摄像头 + Token
   apiLoading.value = true
@@ -285,6 +433,13 @@ const handleNodeClick = async (data) => {
     currentStoreName.value = data.label
     currentToken.value = result.accessToken
     currentCameras.value = result.cameras
+    // 缓存摄像头数据，切分屏时复用
+    cachedStoreData.value = { storeId: data.id, cameras: result.cameras, token: result.accessToken }
+
+    // 自动加载该门店的配送事件
+    loadDeliveryEvents(data.id)
+    // 默认打开配送面板
+    showDeliveryPanel.value = true
   } catch (e) {
     console.error('获取摄像头列表失败:', e)
     currentCameras.value = []
@@ -298,14 +453,28 @@ const toggleScreen = async (single) => {
   if (isSingleScreen.value === single) return
   isSingleScreen.value = single
   connectedFlags.value = {}
+  resetExactPlayback()
 
-  // 从单屏切回4分屏时，重新从 API 拉取（确保拿到最新的 sdUrl 列表）
+  // 从单屏切回4分屏：优先用缓存数据，避免重新加载
   if (!single && currentStoreId.value) {
+    // 检查缓存是否命中
+    if (cachedStoreData.value && cachedStoreData.value.storeId === currentStoreId.value) {
+      currentCameras.value = cachedStoreData.value.cameras
+      currentToken.value = cachedStoreData.value.token
+      return
+    }
+    // 缓存未命中时才从 API 拉取
     apiLoading.value = true
     try {
       const result = await fetchStoreCameras(currentStoreId.value)
       currentToken.value = result.accessToken
       currentCameras.value = result.cameras
+      // 更新缓存
+      cachedStoreData.value = {
+        storeId: currentStoreId.value,
+        cameras: result.cameras,
+        token: result.accessToken,
+      }
     } catch (e) {
       console.error('切换分屏获取数据失败:', e)
     } finally {
@@ -326,6 +495,7 @@ const zoomToSingle = async (slotIndex) => {
 
   isSingleScreen.value = true
   connectedFlags.value = {}
+  resetExactPlayback()
 }
 </script>
 
@@ -411,7 +581,15 @@ html, body, #app {
   color: #409eff;
 }
 
-/* ── 右侧主内容 ── */
+/* ── 右侧主区域（视频 + 配送面板） ── */
+.main-area {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ── 视频主内容 ── */
 .main-content {
   flex: 1;
   display: flex;
@@ -555,6 +733,27 @@ html, body, #app {
 .playback-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* ── 配送事件切换按钮 ── */
+.delivery-toggle {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #888;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.delivery-toggle:hover {
+  color: #e6a23c;
+}
+.delivery-toggle.active {
+  background: rgba(230, 162, 60, 0.15);
+  color: #e6a23c;
 }
 
 .screen-toggle {

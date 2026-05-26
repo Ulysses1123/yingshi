@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 import monitorRoutes from './routes/monitor.routes.js';
+import deliveryRoutes from './routes/delivery.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -34,6 +35,8 @@ if (!loaded) {
 console.log('🔧 环境变量检查:');
 console.log('   YS_APP_KEY:', process.env.YS_APP_KEY ? '已配置 (' + process.env.YS_APP_KEY.substring(0, 8) + '...)' : '未配置');
 console.log('   YS_APP_SECRET:', process.env.YS_APP_SECRET ? '已配置 (' + process.env.YS_APP_SECRET.substring(0, 8) + '...)' : '未配置');
+console.log('   JS_APP_KEY:', process.env.JS_APP_KEY ? '已配置 (' + process.env.JS_APP_KEY.substring(0, 8) + '...)' : '未配置 (配送使用 mock 数据)');
+console.log('   JS_APP_SECRET:', process.env.JS_APP_SECRET ? '已配置 (' + process.env.JS_APP_SECRET.substring(0, 8) + '...)' : '未配置');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -68,6 +71,19 @@ app.get('/health', (req, res) => {
 
 // API 路由
 app.use('/api/v1/monitor', monitorRoutes);
+app.use('/api/v1/delivery', deliveryRoutes);
+
+// ---- 前端静态文件托管（生产模式） ----
+const distPath = join(__dirname, '../../dist');
+app.use(express.static(distPath));
+
+// 处理 SPA 路由：非 API 请求都返回 index.html（支持前端路由）
+app.get('*', (req, res) => {
+  // 只处理非 /api 开头的路径
+  if (!req.path.startsWith('/api')) {
+    res.sendFile(join(distPath, 'index.html'));
+  }
+});
 
 // 404 处理
 app.use((req, res) => {
@@ -90,14 +106,15 @@ app.use((err, req, res, next) => {
 
 // 启动服务器
 app.listen(PORT, () => {
-  console.log('\n🚀 萤石视频监控后端服务已启动');
-  console.log(`📡 服务地址: http://localhost:${PORT}`);
+  console.log('\n🚀 萤石视频监控系统已启动');
+  console.log(`📡 访问地址: http://localhost:${PORT}`);
   console.log(`📋 API 文档:`);
   console.log(`   - 健康检查: GET http://localhost:${PORT}/health`);
   console.log(`   - 门店树:   GET http://localhost:${PORT}/api/v1/monitor/store-tree`);
   console.log(`   - 摄像头:   GET http://localhost:${PORT}/api/v1/monitor/stores/:storeId/cameras`);
-  console.log(`   - Token状态: GET http://localhost:${PORT}/api/v1/monitor/token/status`);
-  console.log(`   - 刷新Token: POST http://localhost:${PORT}/api/v1/monitor/token/refresh`);
+   console.log(`   - Token状态: GET http://localhost:${PORT}/api/v1/monitor/token/status`);
+   console.log(`   - 刷新Token: POST http://localhost:${PORT}/api/v1/monitor/token/refresh`);
+   console.log(`   - 配送事件: GET http://localhost:${PORT}/api/v1/delivery/stores/:storeId/events`);
   console.log('');
 });
 

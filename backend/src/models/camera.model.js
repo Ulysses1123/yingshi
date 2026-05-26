@@ -2,14 +2,16 @@ import { memoryDB } from '../config/memory-db.js';
 import pool from '../config/database.js';
 
 // 判断是否使用内存模式
-let useMemory = false;
+// 默认使用内存模式（安全），仅当 MySQL 连接成功时才切换到数据库
+let useMemory = true;
 
 pool.getConnection()
   .then(conn => {
+    useMemory = false;
     conn.release();
   })
   .catch(() => {
-    useMemory = true;
+    // 保持内存模式
   });
 
 class CameraModel {

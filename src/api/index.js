@@ -46,3 +46,27 @@ export async function fetchStoreTree() {
 export async function fetchStoreCameras(storeId) {
   return request(`/stores/${storeId}/cameras`)
 }
+
+/**
+ * 配送事件 API 基地址
+ */
+const DELIVERY_BASE = '/api/v1/delivery'
+
+/**
+ * 获取指定门店的配送事件列表
+ * @param {number} storeId 门店ID
+ * @param {string} [date] 查询日期，格式 yyyy-MM-dd，默认今天
+ * @returns {Promise<{ orders: Array, storeId: number, date: string }>}
+ */
+export async function fetchDeliveryEvents(storeId, date) {
+  const params = new URLSearchParams()
+  if (date) params.set('date', date)
+  const qs = params.toString()
+  const url = `${DELIVERY_BASE}/stores/${storeId}/events${qs ? '?' + qs : ''}`
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+  })
+  const result = await res.json()
+  if (result.code !== 200) throw new Error(result.msg || '获取配送事件失败')
+  return result.data
+}
